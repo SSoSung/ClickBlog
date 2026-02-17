@@ -151,8 +151,11 @@ async function generateAIFallbackTopic() {
         const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
         const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-        logger.info('Gemini를 사용하여 창의적인 블로그 주제를 생성합니다...');
-        const prompt = "기술, 재테크, 미래 전략 중 사람들이 열광할 만한 흥미로운 블로그 주제 1개와 관련 키워드 3개를 JSON으로 제안해줘. 형식: {\"title\": \"주제\", \"relatedQueries\": [\"키워드1\", \"키워드2\", \"키워드3\"]}";
+        const today = new Date();
+        const year = today.getFullYear();
+
+        logger.info(`${year}년 기준 창의적인 블로그 주제를 생성합니다...`);
+        const prompt = `당신은 ${year}년을 살고 있는 트렌드 분석가입니다. 현재 시점에서 화제가 될 법한 기술, 재테크, 미래 전략 중 흥미로운 블로그 주제 1개와 관련 키워드 3개를 JSON으로 제안해줘. 형식: {"title": "주제", "relatedQueries": ["키워드1", "키워드2", "키워드3"]}`;
 
         const result = await model.generateContent(prompt);
         const response = await result.response;

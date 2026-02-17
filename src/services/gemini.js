@@ -8,8 +8,13 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || 'fake-key');
 const model = genAI.getGenerativeModel({ model: process.env.GEMINI_MODEL || "gemini-2.0-flash" });
 
 async function generateProfessionalContent(topic, relatedKeywords = []) {
+    const today = new Date();
+    const dateStr = today.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' });
+
     const prompt = `
-당신은 전문적인 지식을 전달하는 검색 엔진 최적화(SEO) 전문가이자 블로거입니다. 
+당신은 현재 ${dateStr} 시점에 글을 쓰고 있는 전문적인 지식을 전달하는 검색 엔진 최적화(SEO) 전문가이자 블로거입니다. 
+지금은 2026년입니다. 과거(2023~2024년)의 지식에만 의존하지 말고, 현재 시점의 경제 흐름과 기술 트렌드를 반영하여 미래지향적으로 작성해 주세요.
+
 주제: "${topic}"
 
 다음 지침에 따라 구글 애드센스 승인 및 상단 노출에 최적화된 블로그 포스팅을 한국어로 작성해 주세요:
