@@ -19,12 +19,18 @@ async function runAutomationPipeline(isDryRun = false) {
 
         // 1. 주제 선정 (Trends 기반)
         const trends = await topicEngine.getTrendingTopics();
+        const historyData = topicEngine.loadClusters();
+        const postedTopics = historyData.history.map(h => h.topic);
+
         if (trends.length === 0) {
             logger.warn('수집된 인기 주제가 없습니다. 종료합니다.');
             return;
         }
-        const selectedTopic = trends[0]; // 가장 인기 있는 주제 선택
-        logger.info(`선정된 주제: ${selectedTopic.title}`);
+
+        // 이미 포스팅한 주제는 제외하고 선택
+        const selectedTopic = trends.find(t => !postedTopics.includes(t.title)) || trends[0];
+
+        logger.info(`선정된 주제: ${selectedTopic.title} (기존 포스팅 여부: ${postedTopics.includes(selectedTopic.title)})`);
 
         // 2. 콘텐츠 생성 (Gemini)
         const rawContent = await gemini.generateProfessionalContent(selectedTopic.title, selectedTopic.relatedQueries);
