@@ -22,13 +22,27 @@ async function runAutomationPipeline(isDryRun = false) {
         const historyData = topicEngine.loadClusters();
         const postedTopics = historyData.history.map(h => h.topic);
 
-        if (trends.length === 0) {
-            logger.warn('수집된 인기 주제가 없습니다. 종료합니다.');
-            return;
-        }
+        let selectedTopic;
 
         // 이미 포스팅한 주제는 제외하고 선택
-        const selectedTopic = trends.find(t => !postedTopics.includes(t.title)) || trends[0];
+        selectedTopic = trends.find(t => !postedTopics.includes(t.title));
+
+        if (!selectedTopic) {
+            logger.warn('새로운 트렌드 주제가 없습니다. AI 대체 주제 생성을 시도합니다.');
+            const aiTopic = await generateAIFallbackTopic();
+            if (aiTopic) {
+                selectedTopic = aiTopic;
+            } else {
+                // 정말 최후의 수단: 비상용 리스트에서 아직 안 쓴 것 선택
+                const fallbackTopics = [
+                    { title: "2026년 반도체 시장 전망과 투자 전략", relatedQueries: ["엔비디아", "삼성전자", "HBM 반도체"] },
+                    { title: "비트코인 ETF 이후의 암호화폐 시장 변화", relatedQueries: ["이더리움", "알트코인", "자산 배분"] },
+                    { title: "생성형 AI 기술이 바꾸는 미래의 직업 지형도", relatedQueries: ["LLM", "자동화", "업무 생산성"] },
+                    { title: "글로벌 금리 인하 사이클과 부동산 시장", relatedQueries: ["금리 정책", "주택 담보 대출", "글로벌 경제"] }
+                ];
+                selectedTopic = fallbackTopics.find(t => !postedTopics.includes(t.title)) || fallbackTopics[0];
+            }
+        }
 
         logger.info(`선정된 주제: ${selectedTopic.title} (기존 포스팅 여부: ${postedTopics.includes(selectedTopic.title)})`);
 
@@ -71,16 +85,49 @@ async function runAutomationPipeline(isDryRun = false) {
         if (isDryRun || process.env.DRY_RUN === 'true') {
             logger.info('--- DRY RUN 결과 ---');
             console.log(`제목: ${selectedTopic.title}`);
-            console.log('--- HTML 내용 생략 (로그 파일 확인 권장) ---');
+            const tags = gemini.extractTags(rawContent);
+            console.log(`추출된 태그: ${tags.join(', ')}`);
             logger.info('Dry-run 모드이므로 실제로 게시하지 않았습니다.');
         } else {
-            await blogger.postToBlogger(selectedTopic.title, finalHtml, ["전문지식", "트렌드분석", selectedTopic.title]);
+            const tags = gemini.extractTags(rawContent);
+            // 본문에서 [TAGS: ...] 부분 제거하여 깔끔하게 전송
+            const cleanHtml = finalHtml.replace(/\[TAGS:.*?\]/gi, '').trim();
+
+            await blogger.postToBlogger(selectedTopic.title, cleanHtml, [...tags, "전문지식", selectedTopic.title.substring(0, 15)]);
             topicEngine.saveTopicToHistory(selectedTopic.title, "일반", "트렌드");
             logger.info('모든 프로세스가 성공적으로 완료되었습니다.');
         }
 
     } catch (err) {
         logger.error('자동화 파이프라인 중 치명적 에러 발생:', err);
+    }
+}
+
+/**
+ * 트렌드 수집 실패 시 Gemini를 통해 주제 생성
+ */
+async function generateAIFallbackTopic() {
+    try {
+        const { GoogleGenerativeAI } = require('@google/generative-ai');
+        const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+        const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+        logger.info('Gemini를 사용하여 창의적인 블로그 주제를 생성합니다...');
+        const prompt = "기술, 재테크, 미래 전략 중 사람들이 열광할 만한 흥미로운 블로그 주제 1개와 관련 키워드 3개를 JSON으로 제안해줘. 형식: {title: '', relatedQueries: []}";
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        const text = response.text();
+        try {
+            const topic = JSON.parse(text);
+            if (topic.title && topic.relatedQueries && Array.isArray(topic.relatedQueries)) {
+                return topic;
+            }
+        } catch (parseError) {
+            logger.error('Gemini 응답 파싱 실패:', parseError);
+        }
+        return null;
+    } catch (e) {
+        logger.error('Gemini 대체 주제 생성 중 에러 발생:', e);
+        return null;
     }
 }
 
@@ -94,6 +141,30 @@ postingHours.forEach(hour => {
     });
     logger.info(`예약 완료: 매일 ${hour}시`);
 });
+
+/**
+ * 트렌드 수집 실패 시 Gemini를 통해 주제 생성
+ */
+async function generateAIFallbackTopic() {
+    try {
+        const { GoogleGenerativeAI } = require('@google/generative-ai');
+        const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+
+        logger.info('Gemini를 사용하여 창의적인 블로그 주제를 생성합니다...');
+        const prompt = "기술, 재테크, 미래 전략 중 사람들이 열광할 만한 흥미로운 블로그 주제 1개와 관련 키워드 3개를 JSON으로 제안해줘. 형식: {\"title\": \"주제\", \"relatedQueries\": [\"키워드1\", \"키워드2\", \"키워드3\"]}";
+
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        const text = response.text().replace(/```json/gi, '').replace(/```/g, '').trim();
+
+        const topic = JSON.parse(text);
+        return topic;
+    } catch (e) {
+        logger.error('Gemini 대체 주제 생성 중 에러 발생:', e);
+        return null;
+    }
+}
 
 // 즉시 실행 (테스트용)
 if (process.argv.includes('--now')) {

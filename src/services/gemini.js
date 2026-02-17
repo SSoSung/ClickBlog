@@ -23,6 +23,7 @@ async function generateProfessionalContent(topic, relatedKeywords = []) {
     - 관련 키워드 반영: ${relatedKeywords.join(', ')}
 4. **결론**: 요약 및 독자의 다음 행동(생각해볼 점) 제시
 5. **SEO 메타 데이터**: 150자 내외의 메타 디스크립션 포함
+6. **태그 추출**: 본문과 관련된 고품질 검색 키워드 5개를 쉼표로 구분하여 맨 마지막에 [TAGS: 키워드1, 키워드2...] 형식으로 포함해 주세요.
 
 **형식**: HTML 태그를 포함하여 출력해 주세요. (h1, h2, h3, p, ul, li, table, strong 등 사용)
 
@@ -41,6 +42,17 @@ async function generateProfessionalContent(topic, relatedKeywords = []) {
         logger.error('Gemini 콘텐츠 생성 중 에러 발생:', err);
         throw err;
     }
+}
+
+/**
+ * 생성된 콘텐츠에서 태그만 추출
+ */
+function extractTags(content) {
+    const tagMatch = content.match(/\[TAGS:\s*(.*?)\]/i);
+    if (tagMatch && tagMatch[1]) {
+        return tagMatch[1].split(',').map(t => t.trim());
+    }
+    return ["IT", "비즈니스", "트렌드"];
 }
 
 async function extractKeyFactsForInfographic(content) {
@@ -73,5 +85,6 @@ ${content.substring(0, 3000)}
 
 module.exports = {
     generateProfessionalContent,
-    extractKeyFactsForInfographic
+    extractKeyFactsForInfographic,
+    extractTags
 };
