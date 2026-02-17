@@ -1,0 +1,38 @@
+name: Daily Blog Post
+
+on:
+  schedule:
+    # 한국 시간 기준: 08:00 (UTC 23:00 전날), 14:00 (UTC 05:00), 19:00 (UTC 10:00)
+    - cron: '0 23 * * *'
+    - cron: '0 5 * * *'
+    - cron: '0 10 * * *'
+  workflow_dispatch:
+    # 깃허브 웹사이트에서 수동으로 버튼 눌러 실행 가능
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run automation script
+        run: node src/index.js --now
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_MODEL: ${{ secrets.GEMINI_MODEL }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
+          BLOGGER_ID: ${{ secrets.BLOGGER_ID }}
+          DRY_RUN: 'false'

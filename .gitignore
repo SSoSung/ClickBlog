@@ -1,0 +1,7 @@
+node_modules/
+.env
+logs/
+data/topic_history.json
+# OS generated files
+.DS_Store
+Thumbs.db
