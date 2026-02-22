@@ -60,6 +60,26 @@ function extractTags(content) {
     return ["IT", "비즈니스", "트렌드"];
 }
 
+/**
+ * 텍스트 내에서 JSON 객체를 찾아 파싱
+ */
+function extractJSON(text) {
+    try {
+        // 먼저 백틱 제거
+        const cleaned = text.replace(/```json/gi, '').replace(/```/g, '').trim();
+        // 가장 바깥쪽 { } 찾기
+        const start = cleaned.indexOf('{');
+        const end = cleaned.lastIndexOf('}');
+        if (start === -1 || end === -1) return null;
+
+        const jsonStr = cleaned.substring(start, end + 1);
+        return JSON.parse(jsonStr);
+    } catch (e) {
+        logger.error('JSON 추출 실패:', e);
+        return null;
+    }
+}
+
 async function extractKeyFactsForInfographic(content) {
     const prompt = `
 다음 블로그 포스팅에서 핵심 데이터(수치, 기업, 기술 등)를 3-5가지 추출하여 JSON으로만 답변하세요.
@@ -79,9 +99,8 @@ ${content.substring(0, 3000)}
     try {
         const result = await model.generateContent(prompt);
         const response = await result.response;
-        let text = response.text();
-        // 정화 작업 (백틱 등 제거)
-        return text.replace(/```json/gi, '').replace(/```html/gi, '').replace(/```/g, '').trim();
+        const text = response.text();
+        return extractJSON(text);
     } catch (err) {
         logger.error('인포그래픽 데이터 추출 중 에러 발생:', err);
         return null;
@@ -124,14 +143,18 @@ async function generateAIFallbackTopic() {
         logger.info(`${year}년 기준 창의적인 블로그 주제를 생성합니다...`);
         const prompt = `당신은 ${year}년을 살고 있는 트렌드 분석가입니다. 현재 시점에서 화제가 될 법한 기술, 재테크, 미래 전략 중 흥미로운 블로그 주제 1개와 관련 키워드 3개를 JSON으로 제안해줘. 
 참고로 단순히 '2026년 반도체 전망' 같은 뻔한 주제 말고, 구체적이고 흥미로운 각도에서 접근해줘.
+인사말 없이 반드시 JSON 형식으로만 응답해줘.
 형식: {"title": "주제", "relatedQueries": ["키워드1", "키워드2", "키워드3"]}`;
 
         const result = await model.generateContent(prompt);
         const response = await result.response;
-        const text = response.text().replace(/```json/gi, '').replace(/```/g, '').trim();
+        const text = response.text();
 
-        const topic = JSON.parse(text);
-        return topic;
+        const topic = extractJSON(text);
+        if (topic && topic.title && Array.isArray(topic.relatedQueries)) {
+            return topic;
+        }
+        throw new Error('올바른 JSON 형식이 아닙니다.');
     } catch (e) {
         logger.error('Gemini 대체 주제 생성 중 에러 발생:', e);
         return null;
