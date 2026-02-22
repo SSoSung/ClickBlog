@@ -88,8 +88,60 @@ ${content.substring(0, 3000)}
     }
 }
 
+async function isTopicSimilar(newTopic, existingTopics) {
+    if (existingTopics.length === 0) return false;
+
+    const prompt = `
+당신은 블로그 운영 전문가입니다. 다음 새 주제가 기존에 작성된 주제들과 내용상으로 크게 겹치는지 판단해 주세요.
+완전히 똑같지 않더라도 다루는 핵심 내용이나 대상이 동일하면 중복으로 간주합니다.
+
+기존 주제들:
+${existingTopics.slice(-15).map((t, i) => `${i + 1}. ${t}`).join('\n')}
+
+새 주제: "${newTopic}"
+
+중복 여부를 "중복" 또는 "새로운주제" 중 하나로 답변하고, 그 뒤에 짧은 이유를 적어주세요. 
+형식: [결과] 이유
+`;
+
+    try {
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        const text = response.text().trim();
+        logger.info(`유사도 체크 결과: ${text}`);
+        return text.includes('[중복]');
+    } catch (err) {
+        logger.error('유사도 체크 중 에러 발생:', err);
+        return false; // 에러 시에는 진행 허용
+    }
+}
+
+async function generateAIFallbackTopic() {
+    try {
+        const today = new Date();
+        const year = today.getFullYear();
+
+        logger.info(`${year}년 기준 창의적인 블로그 주제를 생성합니다...`);
+        const prompt = `당신은 ${year}년을 살고 있는 트렌드 분석가입니다. 현재 시점에서 화제가 될 법한 기술, 재테크, 미래 전략 중 흥미로운 블로그 주제 1개와 관련 키워드 3개를 JSON으로 제안해줘. 
+참고로 단순히 '2026년 반도체 전망' 같은 뻔한 주제 말고, 구체적이고 흥미로운 각도에서 접근해줘.
+형식: {"title": "주제", "relatedQueries": ["키워드1", "키워드2", "키워드3"]}`;
+
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        const text = response.text().replace(/```json/gi, '').replace(/```/g, '').trim();
+
+        const topic = JSON.parse(text);
+        return topic;
+    } catch (e) {
+        logger.error('Gemini 대체 주제 생성 중 에러 발생:', e);
+        return null;
+    }
+}
+
 module.exports = {
     generateProfessionalContent,
     extractKeyFactsForInfographic,
-    extractTags
+    extractTags,
+    isTopicSimilar,
+    generateAIFallbackTopic
 };

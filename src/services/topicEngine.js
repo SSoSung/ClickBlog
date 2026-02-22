@@ -22,23 +22,29 @@ function loadClusters() {
     return JSON.parse(fs.readFileSync(CLUSTERS_PATH, 'utf-8'));
 }
 
+const FALLBACK_TOPICS = [
+    { title: "2026년 반도체 시장 전망과 투자 전략", relatedQueries: ["엔비디아", "삼성전자", "HBM 반도체"] },
+    { title: "비트코인 ETF 승인 이후의 암호화폐 시장 변화", relatedQueries: ["이더리움", "알트코인", "자산 배분"] },
+    { title: "생성형 AI 기술이 바꾸는 미래의 직업 지형도", relatedQueries: ["LLM", "자동화", "업무 생산성"] },
+    { title: "미국 연준의 금리 정책과 글로벌 경제 영향", relatedQueries: ["인플레이션", "환율", "경기 침체"] },
+    { title: "글로벌 금리 인하 사이클과 부동산 시장", relatedQueries: ["금리 정책", "주택 담보 대출", "글로벌 경제"] }
+];
+
+function normalizeTopic(topic) {
+    if (!topic) return "";
+    return topic.trim().replace(/\s+/g, ' ');
+}
+
 async function getTrendingTopics() {
     try {
-        logger.info('Google Trends에서 실시간인기 키워드를 수집합니다...');
+        logger.info('Google Trends에서 실시간 인기 키워드를 수집합니다...');
         const results = await googleTrends.dailyTrends({
             geo: 'KR',
         });
 
-        // JSON 파싱 시도
-        let data;
-        try {
-            data = JSON.parse(results);
-        } catch (parseErr) {
-            throw new Error('Google Trends 응답이 JSON 형식이 아닙니다. (차단된 가능성)');
-        }
-
+        const data = JSON.parse(results);
         const topics = data.default.trendingSearchesDays[0].trendingSearches.map(item => ({
-            title: item.title.query,
+            title: normalizeTopic(item.title.query),
             traffic: item.formattedTraffic,
             relatedQueries: item.relatedQueries.map(q => q.query)
         }));
@@ -46,18 +52,7 @@ async function getTrendingTopics() {
         return topics;
     } catch (err) {
         logger.error('Google Trends 수집 중 에러 발생, 비상용 전문 주제를 사용합니다.');
-
-        // 비상용 전문 지식 주제 리스트
-        const fallbackTopics = [
-            { title: "2026년 반도체 시장 전망과 투자 전략", relatedQueries: ["엔비디아", "삼성전자", "HBM 반도체"] },
-            { title: "비트코인 ETF 승인 이후의 암호화폐 시장 변화", relatedQueries: ["이더리움", "알트코인", "자산 배분"] },
-            { title: "생성형 AI 기술이 바꾸는 미래의 직업 지형도", relatedQueries: ["LLM", "자동화", "업무 생산성"] },
-            { title: "미국 연준의 금리 정책과 글로벌 경제 영향", relatedQueries: ["인플레이션", "환율", "경기 침체"] }
-        ];
-
-        // 랜덤으로 하나 선택
-        const randomTopic = fallbackTopics[Math.floor(Math.random() * fallbackTopics.length)];
-        return [randomTopic];
+        return FALLBACK_TOPICS;
     }
 }
 
